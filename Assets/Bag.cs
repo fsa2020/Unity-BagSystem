@@ -284,8 +284,11 @@ public class Bag : MonoBehaviour
             for (int i = 0; i < itemUIs.Count; i++)
             {
                 if (i == tempIndex && isDragging) continue;
-                float lerpX = Mathf.SmoothStep(orgPosList[i].x, targetPosList[i].x, moveTime / moveAnimationTime);
-                float lerpY = Mathf.SmoothStep(orgPosList[i].y, targetPosList[i].y, moveTime / moveAnimationTime);
+
+                float step = getDelayStep(i,clickItemIndex,tempIndex, moveTime / moveAnimationTime);
+                
+                float lerpX = Mathf.SmoothStep(orgPosList[i].x, targetPosList[i].x, step);
+                float lerpY = Mathf.SmoothStep(orgPosList[i].y, targetPosList[i].y, step);
                 Vector3 pos = itemUIs[i].transform.position;
                 pos.x = lerpX;
                 pos.y = lerpY;
@@ -304,6 +307,17 @@ public class Bag : MonoBehaviour
             itemMask.transform.position = clickItem.transform.position;
         }
 
+    }
+
+    float getDelayStep(int index,int holdingIndex, int targetIndex, float step) 
+    {
+        if (holdingIndex == -1 || targetIndex == -1) return step;
+
+        float delayMax = 0.5f;
+        float delayStep = delayMax / Math.Abs(holdingIndex - targetIndex);
+        float delay = delayStep* (Math.Abs(index - holdingIndex) -1);
+
+        return (step - delay) / (1 - delay);
     }
 
     void SaveInitPos()
@@ -451,7 +465,7 @@ public class Bag : MonoBehaviour
         {
             if (t == ItemType.All) continue;
 
-            int num = UnityEngine.Random.Range(2, 2);
+            int num = UnityEngine.Random.Range(2, 20);
             for (int i = 0; i < num; i++)
             {
                 bagDataSim data = new bagDataSim();
