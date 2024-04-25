@@ -1,0 +1,9 @@
+/.vs
+/.vsconfig
+/Assembly-CSharp.csproj
+/BagSystem.sln
+/Library
+/Logs
+/obj
+/Temp
+/UserSettings
