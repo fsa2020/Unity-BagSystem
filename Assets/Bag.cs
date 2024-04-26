@@ -8,6 +8,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 
+
 public class Bag : MonoBehaviour
 {
     // Start is called before the first frame update
@@ -143,7 +144,7 @@ public class Bag : MonoBehaviour
         
         isDragging = pressTime > longPressTime;
    
-        ItemScroll.GetComponent<ScrollRect>().enabled = !isDragging;
+        ItemScroll.GetComponent<ScrollRect>().enabled = !isDragging && !isItemMoving;
 
 
         if (!isPressing && !isItemMoving && Input.GetMouseButtonDown(0))
@@ -170,6 +171,19 @@ public class Bag : MonoBehaviour
         Vector2 itemPos = item.transform.position;
         Vector2 offset = pos - itemPos;
         return Math.Abs(offset.x) < size.x * 0.45 && Math.Abs(offset.y) < size.y * 0.45;
+    }
+
+    // 0 in mask; 1 above mask; -1 under mask
+    int GetDirByContentMask(Vector2 pos, GameObject mask)
+    {
+        var size = mask.GetComponent<RectTransform>().rect.size;
+        Vector2 itemPos = mask.transform.position;
+        Vector2 offset = pos - itemPos;
+
+
+        if (offset.y > size.y * 0.6)            return 1;
+        else if (offset.y < -size.y * 0.6)      return -1;
+        else                                    return 0;
     }
  
     void OnClickDown(Vector2 pos)
@@ -215,6 +229,7 @@ public class Bag : MonoBehaviour
 
     void OnDragOver()
     {
+
         if (clickItem == null) return;
         //clickItem.transform.localScale = Vector3.one;
         ClearItemMask();
@@ -224,45 +239,84 @@ public class Bag : MonoBehaviour
     void OnDragStart() 
     {
         Debug.Log("Drag start");
+        itemPosBeforeDragging = clickItem.transform.position;
+        itemScrollContentPosBeforeDragging = ItemScroll.transform.Find("Viewport/Content").transform.position;
+
         SaveInitPos();
         CreateItemMask();
     }
 
     float moveWaitTime = 0;
     public float moveWaitTimeMax = 0.6f;
-    void OnDragging(Vector2 pos)
+
+    bool DraggingToSlide(Vector2 pos) 
     {
-        if (clickItem == null) return;
+        // drag over mask to move the rect
+        int dir = GetDirByContentMask(pos, ItemScroll.gameObject);
 
-        //Debug.Log("OnDragging" + pos);
-
-        if (isDragBegin) 
+        ScrollRect itemScrollRect = ItemScroll.GetComponent<ScrollRect>();
+        if (dir == 1 && itemScrollRect.verticalNormalizedPosition < 1)
         {
-            OnDragStart();
+            itemScrollRect.verticalNormalizedPosition += 0.002f;
+            return true;
         }
+        else if (dir == -1 && itemScrollRect.verticalNormalizedPosition > 0)
+        {
+            itemScrollRect.verticalNormalizedPosition -= 0.002f;
+            return true;
+        }
+        return false;
+    }
 
-        
-        clickItem.transform.position = pos;
-
+    bool DraggingToInsert(Vector2 pos)
+    {
         int targetIndex = GetInsertIndex(pos);
 
-        //Debug.Log("isItemMoving"+isItemMoving);
-        //Debug.Log("targetIndex" + targetIndex);
-        //Debug.Log("clickItemIndex" + clickItemIndex);
-
-        if (!isItemMoving && targetIndex != -1 && targetIndex!=clickItemIndex)
+        if (!isItemMoving && targetIndex != -1 && targetIndex != clickItemIndex)
         {
             moveWaitTime += Time.deltaTime;
             //Debug.Log(moveWaitTime);
             if (moveWaitTime > moveWaitTimeMax)
             {
                 PlayInsertItemTo(clickItemIndex, targetIndex);
+                return true;
             }
         }
         else
         {
             moveWaitTime = 0;
         }
+        return false;
+    }
+
+
+    void OnDragging(Vector2 pos)
+    {
+        if (clickItem == null) return;
+
+        //Debug.Log("OnDragging" + pos);
+
+        if (isDragBegin)
+        {
+            OnDragStart();
+        }
+
+
+        clickItem.transform.position = pos;
+
+
+        if (DraggingToSlide(pos))
+        {
+            SaveInitPos();
+            return;
+        }
+
+        if (DraggingToInsert(pos))
+        {
+            return;
+        }
+  
+
     }
 
 
@@ -285,7 +339,7 @@ public class Bag : MonoBehaviour
             {
                 if (i == tempIndex && isDragging) continue;
 
-                float step = getDelayStep(i,clickItemIndex,tempIndex, moveTime / moveAnimationTime);
+                float step = GetDelayStep(i,clickItemIndex,tempIndex, moveTime / moveAnimationTime);
                 
                 float lerpX = Mathf.SmoothStep(orgPosList[i].x, targetPosList[i].x, step);
                 float lerpY = Mathf.SmoothStep(orgPosList[i].y, targetPosList[i].y, step);
@@ -309,7 +363,7 @@ public class Bag : MonoBehaviour
 
     }
 
-    float getDelayStep(int index,int holdingIndex, int targetIndex, float step) 
+    float GetDelayStep(int index,int holdingIndex, int targetIndex, float step) 
     {
         if (holdingIndex == -1 || targetIndex == -1) return step;
 
@@ -320,6 +374,9 @@ public class Bag : MonoBehaviour
         return (step - delay) / (1 - delay);
     }
 
+    Vector2 itemPosBeforeDragging = Vector2.zero;
+    Vector2 itemScrollContentPosBeforeDragging= Vector2.zero;
+
     void SaveInitPos()
     {
         initPosList.Clear();
@@ -329,8 +386,15 @@ public class Bag : MonoBehaviour
             initPosList.Add(initPos);
         }
 
-        insertFlagPosList.Clear();
+        if (clickItemIndex!=-1) 
+        {
+            Vector2 curContentPos = ItemScroll.transform.Find("Viewport/Content").transform.position;
+            Vector2 offset = curContentPos - itemScrollContentPosBeforeDragging ;
+            Vector2 pos = itemPosBeforeDragging + offset;
+            initPosList[clickItemIndex] = pos;
+        }
 
+        insertFlagPosList.Clear();
         for (int i = 0; i < itemUIs.Count; i++)
         {
             Vector3 posFlag = itemUIs[i].transform.position;
@@ -356,6 +420,8 @@ public class Bag : MonoBehaviour
             Vector3 posTarget = initPosList[i];
             targetPosList.Add(posTarget);
         }
+
+
     }
 
     public float insertTiggerDistance = 30.0f;
@@ -465,7 +531,7 @@ public class Bag : MonoBehaviour
         {
             if (t == ItemType.All) continue;
 
-            int num = UnityEngine.Random.Range(2, 20);
+            int num = UnityEngine.Random.Range(20, 60);
             for (int i = 0; i < num; i++)
             {
                 bagDataSim data = new bagDataSim();
