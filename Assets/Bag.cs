@@ -8,7 +8,6 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 
-
 public class Bag : MonoBehaviour
 {
     // Start is called before the first frame update
@@ -123,6 +122,9 @@ public class Bag : MonoBehaviour
         BagItemMovingHandler();
     }
 
+    [SerializeField] private bool longPressEnabled = true;
+
+
 
     bool isPressing = false;
     bool isDragBegin = false;
@@ -137,8 +139,8 @@ public class Bag : MonoBehaviour
     float clickCancelOffsetLen = 5;
 
     void ClickAndLongPressHandler() {
-        if (isPressing)     pressTime += Time.deltaTime;
-        else                pressTime = 0.0f;
+        if (isPressing && longPressEnabled) pressTime += Time.deltaTime;
+        else                                pressTime = 0.0f;
 
         isDragBegin = pressTime > longPressTime && !isDragging;
         
@@ -236,12 +238,17 @@ public class Bag : MonoBehaviour
         Debug.Log("Drag end");
     }
 
+    void SaveItemPosBeforeDragging(Vector3 pos) 
+    {
+        itemPosBeforeDragging = pos;
+        itemScrollContentPosBeforeDragging = ItemScroll.transform.Find("Viewport/Content").transform.position;
+    }
+
     void OnDragStart() 
     {
         Debug.Log("Drag start");
-        itemPosBeforeDragging = clickItem.transform.position;
-        itemScrollContentPosBeforeDragging = ItemScroll.transform.Find("Viewport/Content").transform.position;
 
+        SaveItemPosBeforeDragging(clickItem.transform.position);
         SaveInitPos();
         CreateItemMask();
     }
@@ -251,6 +258,7 @@ public class Bag : MonoBehaviour
 
     bool DraggingToSlide(Vector2 pos) 
     {
+        if (isItemMoving) return false;
         // drag over mask to move the rect
         int dir = GetDirByContentMask(pos, ItemScroll.gameObject);
 
@@ -473,6 +481,10 @@ public class Bag : MonoBehaviour
             isItemMoving = true;
 
             tempIndex = targetIndex;
+
+
+            SaveItemPosBeforeDragging(targetPosList[targetIndex]);
+      
         }
 
     }
@@ -516,8 +528,12 @@ public class Bag : MonoBehaviour
 
         if (tempIndex != -1 && clickItemIndex != -1)
         {
+
+            Debug.Log("clickItemIndex from" + clickItemIndex + " change to " + tempIndex);
+
             clickItemIndex = tempIndex;
             tempIndex = -1;
+
         }
     }
 
