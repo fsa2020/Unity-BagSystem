@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -39,6 +41,15 @@ public class Bag : MonoBehaviour
         items = GetItemsInBag();
 
         SetTab();
+
+
+        transform.Find("ButtonSort").GetComponent<Button>()?.onClick.AddListener(() => {
+            PlaySort(); 
+        });
+
+        transform.Find("ButtonShuffle").GetComponent<Button>()?.onClick.AddListener(() => {
+            PlayShuffle();
+        });
     }
 
     List<Transform> tabBtns = new List<Transform>();
@@ -394,7 +405,7 @@ public class Bag : MonoBehaviour
             initPosList.Add(initPos);
         }
 
-        if (clickItemIndex!=-1) 
+        if (clickItemIndex!=-1 && isDragging) 
         {
             Vector2 curContentPos = ItemScroll.transform.Find("Viewport/Content").transform.position;
             Vector2 offset = curContentPos - itemScrollContentPosBeforeDragging ;
@@ -502,6 +513,77 @@ public class Bag : MonoBehaviour
 
     }
 
+    void PlayShuffle() 
+    {
+        if (isItemMoving || isDragging) return;
+        Debug.Log("play sort");
+
+        SaveInitPos();
+        SaveOrgPos();
+        SaveTargetPos();
+
+        List<int> indexList = new List<int>();
+        for (int i = 0; i < orgPosList.Count; i++) indexList.Add(i);
+
+        for (int i = 0; i < orgPosList.Count; i++) 
+        {
+            int rand = UnityEngine.Random.Range(i, orgPosList.Count-1);
+            (indexList[i],indexList[rand]) = (indexList[rand], indexList[i]);        
+        }
+
+        var tempOrgPosList = orgPosList.ToList();
+        var tempItemDatas = itemDatas.ToList();
+        var tempItemUIs = itemUIs.ToList();
+
+        for (int i = 0; i < indexList.Count; i++)
+        {
+            int index = indexList[i];
+            orgPosList[i] = tempOrgPosList[index];
+            itemDatas[i] = tempItemDatas[index];
+            itemUIs[i] = tempItemUIs[index];
+
+
+        }
+
+        moveTime = 0.0f;
+        isItemMoving = true;
+
+    }
+    void PlaySort()
+    {
+        if (isItemMoving || isDragging) return;
+        Debug.Log("play sort");
+
+        SaveInitPos();
+        SaveOrgPos();
+        SaveTargetPos();
+
+        List<int> indexList = new List<int>();
+        for (int i = 0; i<orgPosList.Count; i++) indexList.Add(i);
+
+        indexList.Sort((a, b) => {
+            return itemDatas[a].id.CompareTo(itemDatas[b].id);
+        });
+
+        var tempOrgPosList  = orgPosList.ToList();
+        var tempItemDatas   = itemDatas.ToList();
+        var tempItemUIs     = itemUIs.ToList();
+
+        for (int i = 0; i < indexList.Count; i++) 
+        {
+            int index = indexList[i];
+            orgPosList[i] = tempOrgPosList[index];
+            itemDatas[i] = tempItemDatas[index];
+            itemUIs[i] = tempItemUIs[index];
+
+
+        }
+
+        moveTime = 0.0f;
+        isItemMoving = true;
+
+    }
+
 
     GameObject itemMask = null;
     void CreateItemMask()
@@ -547,7 +629,7 @@ public class Bag : MonoBehaviour
         {
             if (t == ItemType.All) continue;
 
-            int num = UnityEngine.Random.Range(20, 60);
+            int num = UnityEngine.Random.Range(20, 20);
             for (int i = 0; i < num; i++)
             {
                 bagDataSim data = new bagDataSim();
